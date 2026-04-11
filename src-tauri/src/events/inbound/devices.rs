@@ -124,6 +124,21 @@ pub async fn encoder_up(event: PayloadEvent<PressPayload>) -> Result<(), anyhow:
 	crate::events::outbound::encoder::dial_press(&event.payload.device, "dialUp", event.payload.position).await
 }
 
+#[derive(Deserialize)]
+pub struct TouchPayload {
+	pub device: String,
+	pub x: u16,
+	pub y: u16,
+	pub hold: bool,
+}
+
+pub async fn touch_tap(event: PayloadEvent<TouchPayload>) -> Result<(), anyhow::Error> {
+	if crate::device_sleep::note_activity(&event.payload.device).await.unwrap_or(false) {
+		return Ok(());
+	}
+	crate::events::outbound::touchscreen::touch_tap(&event.payload.device, event.payload.x, event.payload.y, event.payload.hold).await
+}
+
 pub async fn rerender_images(_event: PayloadEvent<String>) -> Result<(), anyhow::Error> {
 	crate::events::frontend::profiles::rerender_images(crate::APP_HANDLE.get().unwrap()).await?;
 	Ok(())

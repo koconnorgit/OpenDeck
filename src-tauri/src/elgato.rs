@@ -154,6 +154,9 @@ async fn init(device: AsyncStreamDeck, device_id: String) {
 			ticks: ticks.into(),
 		},
 	};
+	let touch = |x, y, hold| inbound::PayloadEvent {
+		payload: inbound::devices::TouchPayload { device: device_id.clone(), x, y, hold },
+	};
 	loop {
 		let updates = match reader.read(100.0).await {
 			Ok(updates) => updates,
@@ -168,7 +171,9 @@ async fn init(device: AsyncStreamDeck, device_id: String) {
 				DeviceStateUpdate::EncoderTwist(dial, ticks) => inbound::devices::encoder_change(encoder(dial, ticks)).await,
 				DeviceStateUpdate::EncoderDown(dial) => inbound::devices::encoder_down(press(dial)).await,
 				DeviceStateUpdate::EncoderUp(dial) => inbound::devices::encoder_up(press(dial)).await,
-				_ => Ok(()),
+				DeviceStateUpdate::TouchScreenPress(x, y) => inbound::devices::touch_tap(touch(x, y, false)).await,
+				DeviceStateUpdate::TouchScreenLongPress(x, y) => inbound::devices::touch_tap(touch(x, y, true)).await,
+				DeviceStateUpdate::TouchScreenSwipe(_, _) => Ok(()),
 			} {
 				Ok(_) => (),
 				Err(error) => log::warn!("Failed to process device event {update:?}: {error}"),

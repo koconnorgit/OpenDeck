@@ -6,6 +6,7 @@ pub mod keypad;
 pub mod property_inspector;
 pub mod settings;
 pub mod states;
+pub mod touchscreen;
 pub mod will_appear;
 
 use futures::SinkExt;
