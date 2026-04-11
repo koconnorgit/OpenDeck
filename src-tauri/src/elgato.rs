@@ -38,12 +38,11 @@ pub async fn update_image(context: &crate::shared::Context, image: Option<&str>)
 			let data = image.split_once(',').unwrap().1;
 			let bytes = base64::engine::general_purpose::STANDARD.decode(data)?;
 			if context.controller == "Encoder" {
+				let icon = image::load_from_memory(&bytes)?.resize(100, 100, image::imageops::FilterType::Lanczos3);
+				let mut canvas = image::DynamicImage::new_rgb8(200, 100);
+				image::imageops::overlay(&mut canvas, &icon, ((200 - icon.width()) / 2) as i64, ((100 - icon.height()) / 2) as i64);
 				device
-					.write_lcd(
-						context.position as u16 * 200,
-						0,
-						&ImageRect::from_image_async(image::load_from_memory(&bytes)?.resize_exact(200, 100, image::imageops::FilterType::Lanczos3))?,
-					)
+					.write_lcd(context.position as u16 * 200, 0, &ImageRect::from_image_async(canvas)?)
 					.await?;
 			} else if is_touch_point {
 				let (r, g, b) = extract_average_colour(&image::load_from_memory(&bytes)?);
