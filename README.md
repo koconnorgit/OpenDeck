@@ -5,6 +5,9 @@ Linux software for your Elgato Stream Deck
 ![Main menu](.github/readme/mainmenu.png)
 [More screenshots](#showcase)
 
+> [!NOTE]
+> This is [**koconnorgit/OpenDeck**](https://github.com/koconnorgit/OpenDeck), a personal fork of upstream [**nekename/OpenDeck**](https://github.com/nekename/OpenDeck). It carries in-progress fixes for the **Stream Deck + XL** (encoder events, rotated-mount icon defaults, 100×100 LCD region-write constraints, updated udev rules) that have not yet been upstreamed. For official releases and general support, go to the upstream project.
+
 OpenDeck is a desktop application for using stream controller devices like the Elgato Stream Deck on Linux, Windows, and macOS. OpenDeck supports plugins made for the original Stream Deck SDK, allowing many plugins made for the Elgato software ecosystem to be used, or the [OpenAction](https://openaction.amankhanna.me/) API.
 
 Only Elgato hardware is officially supported, but plugins are available for support for other hardware vendors.
@@ -28,25 +31,72 @@ Special thanks go to the developers of [Tauri](https://github.com/tauri-apps/tau
 
 ### Linux
 
-> [!TIP]
-> If you're using a Debian, Ubuntu, Fedora, Fedora Atomic, openSUSE or Arch-based distribution, you can try the new automated installation script:
-> ```bash
-> bash <(curl -sSL https://raw.githubusercontent.com/nekename/OpenDeck/main/install_opendeck.sh)
-> ```
-> The script installs OpenDeck from a released .deb or .rpm file, the AUR, or Flathub, appropriately, and also installs and reloads the appropriate udev subsystem rules. Additionally, you can choose to install Wine from your distribution during the process.
+This fork ships no prebuilt release artifacts yet — installation means **building the AppImage from source**. The recipe below is tested on CachyOS and should work on other Arch-based rolling distributions with minor adjustment.
 
-- Download the latest release from [GitHub Releases](https://github.com/nekename/OpenDeck/releases/latest).
-	- You should avoid AppImage releases of OpenDeck as they tend to have problems (you should also just avoid AppImages in general).
-	- For users of Arch-based distributions, there are the `opendeck` and `opendeck-bin` AUR packages for the latest release, as well as the `opendeck-git` AUR package for the latest commit on the `main` branch of this repository.
-- Install OpenDeck using your package manager of choice.
-- Install the appropriate udev subsystem rules from [here](https://raw.githubusercontent.com/OpenActionAPI/rust-elgato-streamdeck/main/40-streamdeck.rules):
-	- If you're using a `.deb` or `.rpm` release artifact, this file should be installed automatically.
-	- Otherwise, download and copy it to the correct location with `sudo cp 40-streamdeck.rules /etc/udev/rules.d/`.
-	- In both cases, you will need to reload your udev subsystem rules with `sudo udevadm control --reload-rules && sudo udevadm trigger`.
-- If you intend to use some compiled plugins that are not compiled for Linux, you will need to have [Wine](https://www.winehq.org/) installed on your system. Some plugins may also depend on Wine Mono (which is sometimes, but not always included, in your distro's packaging of Wine).
+#### 1. Prerequisites
 
-> [!NOTE]
-> If Flatpak is your only option, OpenDeck is [available from Flathub](https://flathub.org/apps/me.amankhanna.opendeck). Please note that you still need to install the udev subsystem rules as described above. To use Windows and Node.js plugins, you should have Wine or Node.js, respectively, installed natively (the Wine and Node.js Flatpaks are not supported).
+- All [Tauri build prerequisites](https://tauri.app/start/prerequisites) for your distribution (Rust toolchain, WebKitGTK, glib, etc.).
+- **Node.js** and **npm** (the `tauri` CLI is invoked via the `package.json` scripts).
+- **libudev** development headers (`libudev` / `systemd-libs` depending on distro — needed by hidapi).
+- **Wine** (optional): required only if you want to run Stream Deck plugins that only ship Windows binaries. Some plugins also depend on Wine Mono.
+
+#### 2. Clone and build
+
+```sh
+git clone https://github.com/koconnorgit/OpenDeck.git ~/.opendeck/OpenDeck
+cd ~/.opendeck/OpenDeck
+npm install
+NO_STRIP=1 npm run tauri build
+```
+
+> [!IMPORTANT]
+> `NO_STRIP=1` is required on CachyOS and other rolling-release distros that ship modern system libraries with `.relr.dyn` ELF sections (e.g. `libwebp.so`, `libzstd.so`). The `strip` binary bundled inside `linuxdeploy` (cached at `~/.cache/tauri/linuxdeploy-x86_64.AppImage`) is too old to parse those sections, and without the flag the AppImage bundle step fails with `unknown type [0x13] section .relr.dyn`. Binaries end up slightly larger (debug info retained) but are fully functional.
+
+#### 3. Install the AppImage
+
+```sh
+install -D src-tauri/target/release/bundle/appimage/opendeck_*.AppImage ~/.local/bin/OpenDeck.AppImage
+```
+
+The AppImage reads config from `~/.config/opendeck/`, so plugins and profiles carry over from any prior install.
+
+#### 4. Install the udev subsystem rules
+
+Stream Decks on Linux are accessed via `/dev/hidraw*`, which requires a udev rule granting your user `uaccess`. Install the bundled rules file and reload:
+
+```sh
+sudo install -m 0644 src-tauri/bundle/40-streamdeck.rules /etc/udev/rules.d/40-streamdeck.rules
+sudo udevadm control --reload
+```
+
+Then **physically unplug and replug** each Stream Deck. `udevadm trigger` alone does not reliably reapply `uaccess` to an already-connected device — a real replug is the only thing that consistently does.
+
+Verify each Stream Deck's hidraw node now has your user in the ACL:
+
+```sh
+for h in /dev/hidraw*; do
+	udevadm info --query=property --name="$h" 2>/dev/null | grep -q 'ID_VENDOR_ID=0fd9' || continue
+	echo "=== $h ==="; getfacl "$h" | grep -E '^user:'
+done
+```
+
+You should see a `user:<you>:rw-` line for each connected Stream Deck. If not, see [Troubleshooting](#troubleshooting) below.
+
+#### 5. Run it
+
+```sh
+~/.local/bin/OpenDeck.AppImage
+```
+
+To autostart OpenDeck hidden in the system tray on login, create `~/.config/autostart/opendeck.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=OpenDeck
+Exec=/home/YOUR_USERNAME/.local/bin/OpenDeck.AppImage --hide
+X-GNOME-Autostart-enabled=true
+```
 
 ### Windows
 
