@@ -75,9 +75,12 @@ async fn clear_all_touchpoints(device: &AsyncStreamDeck) {
 pub async fn clear_screen(id: &str) -> Result<(), anyhow::Error> {
 	if let Some(device) = ELGATO_DEVICES.read().await.get(id) {
 		device.clear_all_button_images().await?;
-		if device.kind() == Kind::Plus {
+		let kind = device.kind();
+		if kind == Kind::Plus || kind == Kind::PlusXl {
+			let lcd_format = kind.lcd_image_format().unwrap();
+			let (w, h) = lcd_format.size;
 			device
-				.write_lcd_fill(&convert_image_with_format_async(device.kind().lcd_image_format().unwrap(), image::DynamicImage::new_rgb8(800, 100))?)
+				.write_lcd_fill(&convert_image_with_format_async(lcd_format, image::DynamicImage::new_rgb8(w as u32, h as u32))?)
 				.await?;
 		}
 		clear_all_touchpoints(device).await;
@@ -113,6 +116,7 @@ async fn init(device: AsyncStreamDeck, device_id: String) {
 		Kind::Pedal => 5,
 		Kind::Plus => 7,
 		Kind::Neo => 9,
+		Kind::PlusXl => 10,
 	};
 	let _ = device.clear_all_button_images().await;
 	clear_all_touchpoints(&device).await;
