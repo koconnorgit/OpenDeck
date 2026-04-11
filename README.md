@@ -86,6 +86,9 @@ To change other options, open Settings. From here, you can also view information
 		- macOS: `~/Library/Logs/opendeck/`
 - When trying to run compiled plugins built for Windows on Linux or macOS, please ensure you have the latest version of Wine (and Wine Mono) installed on your system.
 - If your device isn't showing up, ensure you have the correct permissions to access it (e.g. on Linux, installing udev subsystem rules and restarting your system), and that you have restarted OpenDeck since connecting it.
+	- On Linux, OpenDeck talks to Stream Decks via `/dev/hidraw*`. If a specific device works on one machine but not another — or one of two connected Stream Decks is missing — an older `40-streamdeck.rules` / `60-streamdeck.rules` file on disk is the most common cause. Newer Stream Deck models (including the Stream Deck + XL, `0fd9:00c6`) may not be listed.
+	- To diagnose: find the device's hidraw node with `for h in /dev/hidraw*; do udevadm info --query=property --name="$h" | grep -q '<PID>' && echo "$h"; done` (replacing `<PID>` with the product ID reported by `lsusb | grep Elgato`), then `getfacl <node>`. If there's no `user:<you>:rw-` line, udev isn't granting the ACL.
+	- To fix: make sure the installed rules file contains **both** a `SUBSYSTEM=="usb"` line *and* a `KERNEL=="hidraw*"` line for your device's product ID. A USB-only rule is not enough — hidapi on Linux uses `/dev/hidraw*`, and the hidraw child does not inherit `uaccess` from the parent USB device. The canonical rules file is [`src-tauri/bundle/40-streamdeck.rules`](src-tauri/bundle/40-streamdeck.rules) in this repo. After editing, `sudo udevadm control --reload` and **physically unplug/replug** the device — `udevadm trigger` alone does not reliably reapply `uaccess` to an already-connected device. Then fully quit and relaunch OpenDeck; it does not retry failed device opens automatically.
 
 ### Support forums
 
