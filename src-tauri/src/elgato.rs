@@ -54,7 +54,11 @@ pub async fn update_image(context: &crate::shared::Context, image: Option<&str>)
 			}
 		} else if context.controller == "Encoder" {
 			device
-				.write_lcd(context.position as u16 * 200, 0, &ImageRect::from_image_async(image::DynamicImage::new_rgb8(200, 100))?)
+				.write_lcd(
+					context.position as u16 * 200 + 50,
+					0,
+					&ImageRect::from_image_async(image::DynamicImage::new_rgb8(100, 100))?,
+				)
 				.await?;
 		} else if is_touch_point {
 			device.set_touchpoint_color(context.position - key_count, 0, 0, 0).await?;
