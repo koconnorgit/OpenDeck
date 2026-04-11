@@ -40,9 +40,9 @@ pub async fn update_image(context: &crate::shared::Context, image: Option<&str>)
 			if context.controller == "Encoder" {
 				device
 					.write_lcd(
-						(context.position as u16 * 200) + 64,
-						14,
-						&ImageRect::from_image_async(image::load_from_memory(&bytes)?.resize(72, 72, image::imageops::FilterType::Nearest))?,
+						context.position as u16 * 200,
+						0,
+						&ImageRect::from_image_async(image::load_from_memory(&bytes)?.resize_exact(200, 100, image::imageops::FilterType::Lanczos3))?,
 					)
 					.await?;
 			} else if is_touch_point {
