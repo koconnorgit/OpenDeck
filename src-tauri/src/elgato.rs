@@ -38,7 +38,10 @@ pub async fn update_image(context: &crate::shared::Context, image: Option<&str>)
 			let data = image.split_once(',').unwrap().1;
 			let bytes = base64::engine::general_purpose::STANDARD.decode(data)?;
 			if context.controller == "Encoder" {
-				let icon = image::load_from_memory(&bytes)?.resize(100, 100, image::imageops::FilterType::Lanczos3);
+				let mut icon = image::load_from_memory(&bytes)?.resize(100, 100, image::imageops::FilterType::Lanczos3);
+				if kind == Kind::PlusXl {
+					icon = icon.rotate270();
+				}
 				let (icon_w, icon_h) = (icon.width(), icon.height());
 				let x = context.position as u16 * 200 + ((200 - icon_w as u16) / 2);
 				let y = (100 - icon_h as u16) / 2;
