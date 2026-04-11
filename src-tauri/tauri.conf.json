@@ -8,7 +8,7 @@
 	},
 	"bundle": {
 		"active": true,
-		"targets": ["appimage"],
+		"targets": "none",
 		"resources": { "target/plugins/": "plugins/" },
 		"linux": {
 			"deb": {
