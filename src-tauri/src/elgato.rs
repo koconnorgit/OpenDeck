@@ -38,14 +38,23 @@ pub async fn update_image(context: &crate::shared::Context, image: Option<&str>)
 			let data = image.split_once(',').unwrap().1;
 			let bytes = base64::engine::general_purpose::STANDARD.decode(data)?;
 			if context.controller == "Encoder" {
-				let mut icon = image::load_from_memory(&bytes)?.resize(100, 100, image::imageops::FilterType::Lanczos3);
+				let img = image::load_from_memory(&bytes)?;
+				let base_x = context.position as u16 * 200;
 				if kind == Kind::PlusXl {
-					icon = icon.rotate270();
+					// Full 200x100 per encoder via two 100x100 tiles.
+					// write_lcd caps width at 100 on PlusXl, so split then rotate each half.
+					let full = img.resize_exact(200, 100, image::imageops::FilterType::Lanczos3);
+					let left = full.crop_imm(0, 0, 100, 100).rotate270();
+					let right = full.crop_imm(100, 0, 100, 100).rotate270();
+					device.write_lcd(base_x, 0, &ImageRect::from_image_async(left)?).await?;
+					device.write_lcd(base_x + 100, 0, &ImageRect::from_image_async(right)?).await?;
+				} else {
+					let icon = img.resize(100, 100, image::imageops::FilterType::Lanczos3);
+					let (icon_w, icon_h) = (icon.width(), icon.height());
+					let x = base_x + ((200 - icon_w as u16) / 2);
+					let y = (100 - icon_h as u16) / 2;
+					device.write_lcd(x, y, &ImageRect::from_image_async(icon)?).await?;
 				}
-				let (icon_w, icon_h) = (icon.width(), icon.height());
-				let x = context.position as u16 * 200 + ((200 - icon_w as u16) / 2);
-				let y = (100 - icon_h as u16) / 2;
-				device.write_lcd(x, y, &ImageRect::from_image_async(icon)?).await?;
 			} else if is_touch_point {
 				let (r, g, b) = extract_average_colour(&image::load_from_memory(&bytes)?);
 				device.set_touchpoint_color(context.position - key_count, r, g, b).await?;
@@ -53,13 +62,16 @@ pub async fn update_image(context: &crate::shared::Context, image: Option<&str>)
 				device.set_button_image(context.position, image::load_from_memory(&bytes)?).await?;
 			}
 		} else if context.controller == "Encoder" {
-			device
-				.write_lcd(
-					context.position as u16 * 200 + 50,
-					0,
-					&ImageRect::from_image_async(image::DynamicImage::new_rgb8(100, 100))?,
-				)
-				.await?;
+			let base_x = context.position as u16 * 200;
+			if kind == Kind::PlusXl {
+				let black = image::DynamicImage::new_rgb8(100, 100);
+				device.write_lcd(base_x, 0, &ImageRect::from_image_async(black.clone())?).await?;
+				device.write_lcd(base_x + 100, 0, &ImageRect::from_image_async(black)?).await?;
+			} else {
+				device
+					.write_lcd(base_x + 50, 0, &ImageRect::from_image_async(image::DynamicImage::new_rgb8(100, 100))?)
+					.await?;
+			}
 		} else if is_touch_point {
 			device.set_touchpoint_color(context.position - key_count, 0, 0, 0).await?;
 		} else {
