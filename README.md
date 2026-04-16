@@ -6,7 +6,7 @@ Linux software for your Elgato Stream Deck
 [More screenshots](#showcase)
 
 > [!NOTE]
-> This is [**koconnorgit/OpenDeck**](https://github.com/koconnorgit/OpenDeck), a personal fork of upstream [**nekename/OpenDeck**](https://github.com/nekename/OpenDeck). It carries in-progress fixes for the **Stream Deck + XL** (encoder events, rotated-mount icon defaults, 100×100 LCD region-write constraints, updated udev rules) that have not yet been upstreamed. For official releases and general support, go to the upstream project.
+> This is [**koconnorgit/OpenDeck**](https://github.com/koconnorgit/OpenDeck), a personal fork of upstream [**nekename/OpenDeck**](https://github.com/nekename/OpenDeck). It carries in-progress fixes for the **Stream Deck + XL** (encoder events, rotated-mount icon defaults, full-width 200×100 encoder LCD rendering via tile splitting around the firmware's 100×100 region-write cap, updated udev rules) that have not yet been upstreamed. For official releases and general support, go to the upstream project.
 
 OpenDeck is a desktop application for using stream controller devices like the Elgato Stream Deck on Linux, Windows, and macOS. OpenDeck supports plugins made for the original Stream Deck SDK, allowing many plugins made for the Elgato software ecosystem to be used, or the [OpenAction](https://openaction.amankhanna.me/) API.
 
