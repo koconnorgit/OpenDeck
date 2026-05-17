@@ -3,6 +3,7 @@
 	import type { Profile } from "$lib/Profile";
 
 	import Browsers from "phosphor-svelte/lib/Browsers";
+	import Copy from "phosphor-svelte/lib/Copy";
 	import FloppyDisk from "phosphor-svelte/lib/FloppyDisk";
 	import Pencil from "phosphor-svelte/lib/Pencil";
 	import Trash from "phosphor-svelte/lib/Trash";
@@ -89,7 +90,7 @@
 		}
 
 		try {
-			await invoke("rename_profile", { device: device.id, oldId, newId });
+			await invoke("rename_profile", { device: device.id, oldId, newId, retain: false });
 		} catch (error: any) {
 			message(error, { title: "Failed to rename profile" });
 			console.error(error);
@@ -122,6 +123,21 @@
 		renamingProfile = null;
 	}
 	$: if (renameInput) renameInput.focus();
+
+	async function duplicateProfile(id: string) {
+		let newId = id + " Copy";
+
+		// Check if a profile with the new ID already exists
+		const allProfiles = Object.values(folders).flat();
+		let counter = 1;
+		while (allProfiles.includes(newId)) {
+			counter++;
+			newId = `${id} Copy ${counter}`;
+		}
+
+		await invoke("rename_profile", { device: device.id, oldId: id, newId, retain: true });
+		await getProfiles(device);
+	}
 
 	let oldValue: string;
 	$: {
@@ -242,7 +258,7 @@
 			{/if}
 			{#each profiles.sort() as profile}
 				<div class="flex flex-row items-center py-2 space-x-2" class:ml-6={id} class:pl-2={id}>
-					<input type="radio" bind:group={value} value={profile} disabled={renamingProfile == profile} aria-label={id ? profile.split("/")[1] : profile} />
+					<input type="radio" bind:group={value} value={profile} disabled={renamingProfile == profile} id={`profile-${encodeURIComponent(profile)}`} aria-label={id ? profile.split("/")[1] : profile} />
 					{#if profile == renamingProfile}
 						<input
 							bind:this={renameInput}
@@ -258,7 +274,10 @@
 							<FloppyDisk size="20" class="text-green-500" />
 						</button>
 					{:else}
-						<span class="grow text-neutral-400">{id ? profile.split("/")[1] : profile}</span>
+						<label class="grow text-neutral-400" for={`profile-${encodeURIComponent(profile)}`}>{id ? profile.split("/")[1] : profile}</label>
+						<button on:click={() => duplicateProfile(profile)} title="Duplicate" aria-label="Duplicate">
+							<Copy size="20" class="text-neutral-400" />
+						</button>
 						{#if profile != value}
 							<button
 								on:click={() => renamingProfile = newId = profile}

@@ -15,7 +15,7 @@ Only Elgato hardware is officially supported, but plugins are available for supp
 > [!TIP]
 > No Stream Deck in front of you? Use OpenDeck with [Tacto](https://tacto.live/) to turn any smartphone into one!
 
-If you would like to support development of OpenDeck, consider [sponsoring me](https://github.com/sponsors/nekename) on GitHub Sponsors! Considering that the power of your Stream Deck comes from the software you use with it, just $5 (only 2.5% of the cost of a Stream Deck+) goes a long way.
+If you would like to support development of OpenDeck, consider sponsoring me on [GitHub Sponsors](https://github.com/sponsors/nekename), [Ko-fi](https://ko-fi.com/nekename) or [Liberapay](https://liberapay.com/nekename)! Considering that the power of your Stream Deck comes from the software you use with it, just $5 (only 2.5% of the cost of a Stream Deck+) goes a long way.
 
 Special thanks go to the developers of [Tauri](https://github.com/tauri-apps/tauri), the [elgato-streamdeck](https://github.com/OpenActionAPI/rust-elgato-streamdeck) Rust library, and [Phosphor Icons](https://phosphoricons.com/).
 
@@ -32,6 +32,9 @@ Special thanks go to the developers of [Tauri](https://github.com/tauri-apps/tau
 ### Linux
 
 This fork ships no prebuilt release artifacts yet — installation means **building the AppImage from source**. The recipe below is tested on CachyOS and should work on other Arch-based rolling distributions with minor adjustment.
+
+> [!NOTE]
+> Upstream nekename/OpenDeck offers an automated installer (`curl -sSL https://raw.githubusercontent.com/nekename/OpenDeck/main/install_opendeck.sh | bash`) that pulls a released `.deb`/`.rpm`, the AUR, or Flathub. It does not apply to this fork because no release artifacts are published here yet — use the build-from-source recipe below.
 
 #### 1. Prerequisites
 
@@ -151,7 +154,7 @@ To change other options, open Settings. From here, you can also view information
 > [!TIP]
 > The development guide for agents present in [AGENTS.md](AGENTS.md) also serves as a useful introduction to the codebase for humans.
 
-You'll need to ensure that all of the [prerequisites for building a Tauri application](https://tauri.app/start/prerequisites) are satisfied to build OpenDeck, as well as making sure that [Deno](https://deno.com/) is installed. On Linux, you'll also need `libudev` installed for your distribution. After running `deno install`, you can use `deno task tauri dev` and `deno task tauri build` to work with OpenDeck.
+You'll need to ensure that all of the [prerequisites for building a Tauri application](https://tauri.app/start/prerequisites) are satisfied to build OpenDeck, as well as making sure that [Deno](https://deno.com/) is installed. On Linux, you'll also need `libudev` and `libdbus` installed for your distribution. After running `deno install`, you can use `deno task tauri dev` and `deno task tauri build` to work with OpenDeck.
 
 Before each commit, please ensure that all of the following are completed:
 1. Rust code has been linted using `cargo clippy` and it discovers no violations

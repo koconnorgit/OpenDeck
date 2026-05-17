@@ -98,7 +98,9 @@ async fn main() {
 			frontend::settings::set_settings,
 			frontend::settings::open_config_directory,
 			frontend::settings::open_log_directory,
-			frontend::settings::get_build_info
+			frontend::settings::get_build_info,
+			frontend::settings::backup_config_directory,
+			frontend::settings::restore_config_directory,
 		])
 		.setup(|app| {
 			APP_HANDLE.set(app.handle().clone()).unwrap();
@@ -163,7 +165,7 @@ Enjoy!"#,
 Every update brings features, bug fixes, and other improvements, which I spend my time implementing for free.
 
 If you spent $125 on your hardware, please consider spending $10 on the software that makes it work.
-You can donate to support development with just a few clicks on GitHub Sponsors.
+You can donate to support development with just a few clicks on GitHub Sponsors, Ko-fi or Liberapay.
 If you have already donated, thank you so much for your support!"#,
 								built_info::PKG_VERSION
 							))
@@ -315,6 +317,24 @@ If you have already donated, thank you so much for your support!"#,
 							let plugin_id = args[pos + 1].clone();
 							std::thread::spawn(move || {
 								tauri::async_runtime::block_on(frontend::plugins::reload_plugin(app, plugin_id));
+							});
+						}
+					} else if let Some(pos) = args.iter().position(|x| x.to_lowercase().trim() == "--sleep-device") {
+						if args.len() > pos + 1 {
+							let device_id = args[pos + 1].clone();
+							std::thread::spawn(move || {
+								if let Err(error) = tauri::async_runtime::block_on(device_sleep::sleep_device(device_id)) {
+									log::error!("Failed to sleep device: {error}");
+								}
+							});
+						}
+					} else if let Some(pos) = args.iter().position(|x| x.to_lowercase().trim() == "--wake-device") {
+						if args.len() > pos + 1 {
+							let device_id = args[pos + 1].clone();
+							std::thread::spawn(move || {
+								if let Err(error) = tauri::async_runtime::block_on(device_sleep::note_activity(&device_id)) {
+									log::error!("Failed to wake device: {error}");
+								}
 							});
 						}
 					} else if let Some(pos) = args.iter().position(|x| x.to_lowercase().trim() == "--process-message") {
