@@ -39,16 +39,20 @@ pub async fn update_image(context: &crate::shared::Context, image: Option<&str>)
 			let data = image.split_once(',').unwrap().1;
 			let bytes = base64::engine::general_purpose::STANDARD.decode(data)?;
 			if context.controller == "Encoder" {
-				let img = generate_encoder_image(context, &bytes).await?;
 				let base_x = context.position as u16 * 200;
 				if kind == Kind::PlusXl {
+					// This fork deliberately renders the action icon full-bleed across the whole
+					// 200x100 zone rather than using the SDK encoder layout (e.g. $B1), which would
+					// shrink the icon to a 48x48 corner rect to make room for a title and value bar.
 					// Full 200x100 per encoder via two 100x100 tiles.
 					// write_lcd caps width at 100 on PlusXl, so split then rotate each half.
-					let left = img.crop_imm(0, 0, 100, 100).rotate270();
-					let right = img.crop_imm(100, 0, 100, 100).rotate270();
+					let full = image::load_from_memory(&bytes)?.resize_exact(200, 100, image::imageops::FilterType::Lanczos3);
+					let left = full.crop_imm(0, 0, 100, 100).rotate270();
+					let right = full.crop_imm(100, 0, 100, 100).rotate270();
 					device.write_lcd(base_x, 0, &ImageRect::from_image_async(left)?).await?;
 					device.write_lcd(base_x + 100, 0, &ImageRect::from_image_async(right)?).await?;
 				} else {
+					let img = generate_encoder_image(context, &bytes).await?;
 					device.write_lcd(base_x, 0, &ImageRect::from_image(img)?).await?;
 				}
 			} else if context.controller == "Infobar" {
