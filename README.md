@@ -101,6 +101,26 @@ Exec=/home/YOUR_USERNAME/.local/bin/OpenDeck.AppImage --hide
 X-GNOME-Autostart-enabled=true
 ```
 
+> [!WARNING]
+> OpenDeck rewrites `~/.config/autostart/opendeck.desktop` and
+> `~/.local/share/applications/opendeck-handler.desktop` on launch, pointing them at
+> whatever path it was started from — and it does **not** honour `XDG_CONFIG_HOME` for
+> these two files. Running a freshly built AppImage straight out of
+> `src-tauri/target/release/bundle/appimage/` will therefore repoint your autostart entry
+> into the build tree, which `cargo clean` (or the next version bump) will happily delete,
+> leaving OpenDeck silently failing to start on login.
+>
+> After testing a build from the target directory, re-check both files:
+>
+> ```sh
+> grep -h Exec ~/.config/autostart/opendeck.desktop \
+>              ~/.local/share/applications/opendeck-handler.desktop
+> ```
+>
+> Note that setting `XDG_CONFIG_HOME` to a scratch directory *is* still worthwhile when
+> testing a build — it correctly isolates `~/.config/opendeck` (profiles, settings and
+> plugins), it just doesn't cover the two `.desktop` files above.
+
 ### Windows
 
 - Download the latest release (`.exe` or `.msi`) from [GitHub Releases](https://github.com/nekename/OpenDeck/releases/latest).
