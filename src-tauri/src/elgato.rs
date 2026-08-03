@@ -9,7 +9,7 @@ use base64::Engine as _;
 use elgato_streamdeck::{
 	AsyncStreamDeck, DeviceStateUpdate,
 	images::{ImageRect, convert_image_with_format_async},
-	info::Kind,
+	info::{ImageRotation, Kind},
 };
 use image::GenericImageView as _;
 use tokio::sync::RwLock;
@@ -44,16 +44,27 @@ pub async fn update_image(context: &crate::shared::Context, image: Option<&str>)
 					// This fork deliberately renders the action icon full-bleed across the whole
 					// 200x100 zone rather than using the SDK encoder layout (e.g. $B1), which would
 					// shrink the icon to a 48x48 corner rect to make room for a title and value bar.
-					// Full 200x100 per encoder via two 100x100 tiles.
-					// write_lcd caps width at 100 on PlusXl, so split then rotate each half.
+					// Full 200x100 per encoder via two 100x100 tiles, each rotated to match the
+					// panel's native portrait orientation. This writes pre-rotated rects directly
+					// rather than going through lcd_image_format, so it is unaffected by the
+					// landscape -> portrait change to that format in elgato-streamdeck 0.13.
 					let full = image::load_from_memory(&bytes)?.resize_exact(200, 100, image::imageops::FilterType::Lanczos3);
 					let left = full.crop_imm(0, 0, 100, 100).rotate270();
 					let right = full.crop_imm(100, 0, 100, 100).rotate270();
 					device.write_lcd(base_x, 0, &ImageRect::from_image_async(left)?).await?;
 					device.write_lcd(base_x + 100, 0, &ImageRect::from_image_async(right)?).await?;
 				} else {
-					let img = generate_encoder_image(context, &bytes).await?;
-					device.write_lcd(base_x, 0, &ImageRect::from_image(img)?).await?;
+					let mut img = generate_encoder_image(context, &bytes).await?;
+					let Some(format) = device.kind().lcd_image_format() else {
+						return Err(anyhow::anyhow!("Failed to get LCD image format"));
+					};
+					img = match format.rotation {
+						ImageRotation::Rot0 => img,
+						ImageRotation::Rot90 => img.rotate90(),
+						ImageRotation::Rot180 => img.rotate180(),
+						ImageRotation::Rot270 => img.rotate270(),
+					};
+					device.write_lcd(base_x, 0, &ImageRect::from_image_async(img)?).await?;
 				}
 			} else if context.controller == "Infobar" {
 				let img = image::load_from_memory(&bytes)?;
@@ -71,13 +82,22 @@ pub async fn update_image(context: &crate::shared::Context, image: Option<&str>)
 		} else if context.controller == "Encoder" {
 			let base_x = context.position as u16 * 200;
 			if kind == Kind::PlusXl {
+				// Mirror the two-tile layout used when drawing, so the whole zone is cleared.
 				let black = image::DynamicImage::new_rgb8(100, 100);
 				device.write_lcd(base_x, 0, &ImageRect::from_image_async(black.clone())?).await?;
 				device.write_lcd(base_x + 100, 0, &ImageRect::from_image_async(black)?).await?;
 			} else {
-				device
-					.write_lcd(base_x, 0, &ImageRect::from_image_async(image::DynamicImage::new_rgb8(200, 100))?)
-					.await?;
+				let mut img = image::DynamicImage::new_rgb8(200, 100);
+				let Some(format) = device.kind().lcd_image_format() else {
+					return Err(anyhow::anyhow!("Failed to get LCD image format"));
+				};
+				img = match format.rotation {
+					ImageRotation::Rot0 => img,
+					ImageRotation::Rot90 => img.rotate90(),
+					ImageRotation::Rot180 => img.rotate180(),
+					ImageRotation::Rot270 => img.rotate270(),
+				};
+				device.write_lcd(base_x, 0, &ImageRect::from_image_async(img)?).await?;
 			}
 		} else if context.controller == "Infobar" {
 			let Some(format) = device.kind().lcd_image_format() else {
@@ -105,16 +125,12 @@ async fn clear_all_touchpoints(device: &AsyncStreamDeck) {
 pub async fn clear_screen(id: &str) -> Result<(), anyhow::Error> {
 	if let Some(device) = ELGATO_DEVICES.read().await.get(id) {
 		device.clear_all_button_images().await?;
-		let kind = device.kind();
-		if kind == Kind::Plus || kind == Kind::PlusXl {
-			let lcd_format = kind.lcd_image_format().unwrap();
-			let (w, h) = lcd_format.size;
+		if let Some(lcd_format) = device.kind().lcd_image_format() {
 			device
-				.write_lcd_fill(&convert_image_with_format_async(lcd_format, image::DynamicImage::new_rgb8(w as u32, h as u32))?)
-				.await?;
-		} else if device.kind() == Kind::Neo {
-			device
-				.write_lcd_fill(&convert_image_with_format_async(device.kind().lcd_image_format().unwrap(), image::DynamicImage::new_rgb8(248, 58))?)
+				.write_lcd_fill(&convert_image_with_format_async(
+					lcd_format,
+					image::DynamicImage::new_rgb8(lcd_format.size.0 as u32, lcd_format.size.1 as u32),
+				)?)
 				.await?;
 		}
 		clear_all_touchpoints(device).await;
@@ -151,7 +167,7 @@ async fn init(device: AsyncStreamDeck, device_id: String) {
 		Kind::Pedal => 5,
 		Kind::Plus => 7,
 		Kind::Neo => 9,
-		Kind::PlusXl => 10,
+		Kind::PlusXl => 13,
 	};
 	let _ = device.clear_all_button_images().await;
 	clear_all_touchpoints(&device).await;
