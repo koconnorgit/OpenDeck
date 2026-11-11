@@ -23,45 +23,63 @@ pub struct SwitchProfileEvent {
 	profile: String,
 }
 
+/// Record the newly focused application and switch to the profiles assigned to it.
+async fn active_application_changed(app_name: String, previous: &mut String) {
+	let app_handle = crate::APP_HANDLE.get().unwrap();
+
+	if !app_name.trim().is_empty() && !app_name.to_lowercase().starts_with(&crate::shared::PRODUCT_NAME.to_lowercase()) {
+		let mut applications = APPLICATIONS.write().await;
+		if !applications.contains(&app_name) {
+			applications.push(app_name.clone());
+			let _ = app_handle.get_webview_window("main").unwrap().emit("applications", applications.clone());
+		}
+	}
+
+	if app_name == *previous {
+		return;
+	}
+
+	let application_profiles = &APPLICATION_PROFILES.read().await.value;
+	let application = application_profiles.get(&app_name);
+	let default = application_profiles.get("opendeck_default");
+	for value in crate::shared::DEVICES.iter() {
+		let device = value.key();
+		let Some(profile) = application.and_then(|d| d.get(device)).or(default.and_then(|d| d.get(device))) else {
+			continue;
+		};
+		if crate::store::profiles::DEVICE_STORES.write().await.get_selected_profile(device).ok().as_ref() == Some(profile) {
+			continue;
+		}
+		let _ = app_handle.get_webview_window("main").unwrap().emit(
+			"switch_profile",
+			SwitchProfileEvent {
+				device: device.clone(),
+				profile: profile.clone(),
+			},
+		);
+	}
+	*previous = app_name;
+}
+
 pub fn init_application_watcher() {
 	tokio::spawn(async move {
 		let mut previous = String::new();
-		let app_handle = crate::APP_HANDLE.get().unwrap();
-		loop {
-			let app_name = if let Ok(win) = get_active_window() {
-				let mut applications = APPLICATIONS.write().await;
-				if !applications.contains(&win.app_name) && !win.app_name.to_lowercase().starts_with(&crate::shared::PRODUCT_NAME.to_lowercase()) && !win.app_name.trim().is_empty() {
-					applications.push(win.app_name.clone());
-					let _ = app_handle.get_webview_window("main").unwrap().emit("applications", applications.clone());
-				}
-				win.app_name
-			} else {
-				String::new()
-			};
 
-			if app_name != previous {
-				let application_profiles = &APPLICATION_PROFILES.read().await.value;
-				let application = application_profiles.get(&app_name);
-				let default = application_profiles.get("opendeck_default");
-				for value in crate::shared::DEVICES.iter() {
-					let device = value.key();
-					let Some(profile) = application.and_then(|d| d.get(device)).or(default.and_then(|d| d.get(device))) else {
-						continue;
-					};
-					if crate::store::profiles::DEVICE_STORES.write().await.get_selected_profile(device).ok().as_ref() == Some(profile) {
-						continue;
-					}
-					let _ = app_handle.get_webview_window("main").unwrap().emit(
-						"switch_profile",
-						SwitchProfileEvent {
-							device: device.clone(),
-							profile: profile.clone(),
-						},
-					);
+		// On KWin Wayland, polling the active window stalls the compositor, so KWin pushes focus changes instead.
+		#[cfg(target_os = "linux")]
+		{
+			let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
+			if crate::kwin_watcher::start(sender).await {
+				while let Some(app_name) = receiver.recv().await {
+					active_application_changed(app_name, &mut previous).await;
 				}
-				previous = app_name;
+				return;
 			}
+		}
 
+		loop {
+			let app_name = get_active_window().map(|win| win.app_name).unwrap_or_default();
+			active_application_changed(app_name, &mut previous).await;
 			tokio::time::sleep(std::time::Duration::from_millis(250)).await;
 		}
 	});

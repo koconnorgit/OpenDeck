@@ -6,6 +6,8 @@ mod device_sleep;
 mod elgato;
 mod encoder_layouts;
 mod events;
+#[cfg(target_os = "linux")]
+mod kwin_watcher;
 mod plugins;
 mod power_events;
 mod shared;
@@ -403,6 +405,9 @@ If you have already donated, thank you so much for your support!"#,
 				std::thread::sleep(std::time::Duration::from_millis(750));
 				futures::executor::block_on(plugins::deactivate_plugins());
 			}
+
+			#[cfg(target_os = "linux")]
+			futures::executor::block_on(kwin_watcher::stop());
 
 			let flush_future = store::profiles::flush_stale_profiles();
 			match futures::executor::block_on(flush_future) {
